@@ -12,12 +12,15 @@ A sleek, real-time Docker container monitoring dashboard built with Python and m
 - Auto-refresh every 15 seconds
 - Clean, modern UI with dark mode
 - Mobile responsive design
+- Change the name of container group
 
 ## 🚀 Quick Start
 
 1. Clone the repository:
+```bash
 git clone https://github.com/matifanger/simple-docker-monitor.git
 cd simple-docker-monitor
+```
 
 2. Create and activate a virtual environment (optional but recommended):
 ```bash
@@ -49,6 +52,26 @@ The following environment variables can be configured in `.env`:
 - `DOCKER_HOST` - Docker daemon socket (default: unix:///var/run/docker.sock)
 - `DEVELOPMENT` - Enable development mode (default: false)
 
+## 🚀 Deploy Using Docker 
+
+1. Make sure Docker is installed on your system.  
+   [Download Docker](https://www.docker.com/products/docker-desktop)
+
+2. Clone the repository and navigate to the project directory:
+   ```bash
+   git clone https://github.com/matifanger/simple-docker-monitor.git
+   cd simple-docker-monitor
+
+3. Build the Docker image:
+```
+docker build -t simple-docker-monitor .
+```
+
+4. Run the Docker container:
+```
+docker run -d -p 3000:3000 -v /var/run/docker.sock:/var/run/docker.sock simple-docker-monitor
+```
+
 ## 🛠️ Tech Stack
 
 - Backend: Python, Flask
@@ -59,6 +82,7 @@ The following environment variables can be configured in `.env`:
 
 ## High Priority
 - [ ] Add authentication system
+- [ ] Connect via SSH
 - [ ] Implement container logs viewing
 - [ ] Add container start/stop/restart controls
 - [ ] Implement error handling for Docker connection issues
