@@ -111,6 +111,8 @@ docker run -d -p 3000:3000 -v /var/run/docker.sock:/var/run/docker.sock simple-d
 
 ## Bugs
 - [ ] When changing the name of the container, it is not immediate upon refresh
+- [ ] Logo is not loading when deploying via Dockerfile
+- [ ] CPU and RAM cards overflows if container name is too large
 
 ## 📝 License
 
