@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html class="dark">
+<head>
+    <title>Docker Monitor</title>
+    <link rel="icon" type="image/x-icon" href="/static/logo.jpg">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @supports not (backdrop-filter: blur(12px)) {
+            .backdrop-blur-xl {
+                background-color: rgba(17, 24, 39, 0.95) !important;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .backdrop-blur-xl {
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+    <script>
+        function updateStats() {
+            if (document.querySelector(".editing")) return;
+            fetch("/api/stats")
+                .then(response => response.json())
+                .then(data => {
+                    const ramUsageGB = (data.system_stats.ram_percent * data.system_stats.total_ram / 100).toFixed(2);
+                    const dockerCpuPercent = data.system_stats.docker_cpu_percent;
+                    const dockerRamPercent = data.system_stats.docker_ram_percent;
+                    const dockerRamGB = (dockerRamPercent * data.system_stats.total_ram / 100).toFixed(2);
+                    
+                    document.getElementById("system-stats").innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- CPU Card -->
+                            <div class="bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-xl p-4 backdrop-blur-xl border border-blue-500/20">
+                                <div class="text-sm text-blue-200 mb-1">CPU Usage</div>
+                                <div class="flex items-baseline gap-2">
+                                    <div class="text-2xl font-bold text-blue-100">${data.system_stats.cpu_percent}%</div>
+                                    <div class="text-sm text-blue-300">(${dockerCpuPercent}% Docker)</div>
+                                </div>
+                                <div class="mt-2 bg-blue-900/30 rounded-full h-2">
+                                    <div class="bg-blue-500 rounded-full h-2 transition-all duration-500" style="width: ${data.system_stats.cpu_percent}%"></div>
+                                </div>
+                                <div class="mt-4 space-y-2">
+                                    ${Object.entries(data.stats)
+                                        .map(([container, stats]) => `
+                                            <div class="flex justify-between items-center text-xs">
+                                                <span class="text-blue-200">${container.split('-').pop()}</span>
+                                                <span class="text-blue-300">${stats.cpu_percent}%</span>
+                                            </div>
+                                        `).join('')}
+                                </div>
+                            </div>
+                            
+                            <!-- Memory Card -->
+                            <div class="bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 rounded-xl p-4 backdrop-blur-xl border border-emerald-500/20">
+                                <div class="text-sm text-emerald-200 mb-1">Memory Usage</div>
+                                <div class="flex items-baseline gap-2">
+                                    <div class="text-2xl font-bold text-emerald-100">${ramUsageGB} GB / ${data.system_stats.total_ram} GB</div>
+                                    <div class="text-sm text-emerald-300">(${dockerRamPercent}% - ${dockerRamGB} GB Docker)</div>
+                                </div>
+                                <div class="mt-2 bg-emerald-900/30 rounded-full h-2">
+                                    <div class="bg-emerald-500 rounded-full h-2 transition-all duration-500" style="width: ${data.system_stats.ram_percent}%"></div>
+                                </div>
+                                <div class="mt-4 space-y-2">
+                                    ${Object.entries(data.stats)
+                                        .map(([container, stats]) => `
+                                            <div class="flex justify-between items-center text-xs">
+                                                <span class="text-emerald-200">${container.split('-').pop()}</span>
+                                                <span class="text-emerald-300">${stats.memory_usage_mb} MB</span>
+                                            </div>
+                                        `).join('')}
+                                </div>
+                            </div>
+                        </div>`;
+
+                    // Containers Update
+                    const groupsContainer = document.getElementById("groups-container");
+                    groupsContainer.innerHTML = "";
+                    
+                    for (const [groupName, groupData] of Object.entries(data.groups)) {
+                        const groupHtml = `
+                            <div class="bg-gray-900/70 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50">
+                                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                    <h2 class="text-xl font-bold text-gray-100 group-name cursor-pointer hover:text-blue-400 transition-colors" 
+                                        data-group="${groupName}" 
+                                        data-original="${groupData.original_name}"
+                                        onclick="editGroupName(this)">
+                                        ${groupName}
+                                    </h2>
+                                    <div class="flex flex-wrap gap-3">
+                                        <div class="px-3 py-1.5 bg-blue-500/10 text-blue-300 rounded-lg text-sm">
+                                            CPU: ${groupData.total_cpu}%
+                                        </div>
+                                        <div class="px-3 py-1.5 bg-emerald-500/10 text-emerald-300 rounded-lg text-sm">
+                                            RAM: ${groupData.total_memory_mb} MB
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="space-y-4">
+                                    ${groupData.containers.map(container => `
+                                        <div class="bg-gray-800/70 rounded-lg p-4 hover:bg-gray-800/90 transition-colors">
+                                            <div class="text-sm font-medium text-gray-400 mb-3">${container}</div>
+                                            <div class="flex flex-wrap gap-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse-slow"></div>
+                                                    <span class="text-sm text-blue-300">
+                                                        ${data.stats[container].cpu_percent}% CPU
+                                                        ${data.stats[container].cpu_limit ? `/ ${data.stats[container].cpu_limit} CPUs` : ""}
+                                                    </span>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse-slow"></div>
+                                                    <span class="text-sm text-emerald-300">
+                                                        ${data.stats[container].memory_usage_mb} MB
+                                                        ${data.stats[container].memory_limit_mb ? `/ ${data.stats[container].memory_limit_mb} MB` : ""}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>`;
+                        groupsContainer.innerHTML += groupHtml;
+                    }
+                });
+        }
+
+        function editGroupName(element) {
+            const currentName = element.textContent.trim();
+            const originalName = element.dataset.original;
+            element.innerHTML = `
+                <input type="text" 
+                    class="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray-100 focus:border-blue-500 focus:outline-none w-full" 
+                    value="${currentName}" 
+                    data-original="${originalName}"
+                    onblur="handleBlur(this)"
+                    onclick="event.stopPropagation()"
+                    ondblclick="event.stopPropagation()"
+                    onkeypress="if(event.key === 'Enter') this.blur()">
+            `;
+            const input = element.querySelector("input");
+            input.focus();
+            input.select();
+            element.classList.add("editing");
+        }
+
+        function handleBlur(input) {
+            // Pequeño delay para permitir doble click
+            setTimeout(() => {
+                if (document.activeElement !== input) {
+                    saveGroupName(input);
+                }
+            }, 200);
+        }
+
+        function saveGroupName(input) {
+            const newName = input.value;
+            const originalName = input.dataset.original;
+            const element = input.parentElement;
+            
+            fetch("/api/rename-group", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ old_name: originalName, new_name: newName })
+            }).then(response => response.json())
+              .then(data => {
+                element.innerHTML = newName;
+                element.dataset.original = originalName;
+                element.classList.remove("editing");
+              });
+        }
+
+        setInterval(updateStats, 15000);
+        document.addEventListener("DOMContentLoaded", updateStats);
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6 font-sans">
+    <div class="max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-4 md:mb-8">
+            <div class="flex gap-1 items-center">
+                <h1 class="text-xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 text-transparent bg-clip-text">
+                    Docker Monitor
+                </h1>
+                <span class="text-xs md:text-sm text-gray-400 self-end mb-0.5">1.0</span>
+            </div>
+            <div class="text-xs md:text-sm text-gray-400">Auto-refresh every 15s</div>
+        </div>
+        
+        <div class="mb-8" id="system-stats"></div>
+        
+        <div id="groups-container" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+    </div>
+</body>
+</html> 
